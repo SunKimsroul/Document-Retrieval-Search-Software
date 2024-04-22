@@ -1,12 +1,17 @@
-    # Import all necessary libraries and their functions.
+# Import all necessary libraries and their functions.
 import os
+import sys
+from PySide2.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QLineEdit, QListWidget, \
+    QMessageBox
 from PySide2.QtWidgets import *
 from PySide2.QtCore import *
 import time
 import re
+import subprocess
 import docx2txt
 import PyPDF2
 import pandas as pd
+
 
 # custom widget class File_search
 class File_search(QWidget):
@@ -15,9 +20,29 @@ class File_search(QWidget):
         super().__init__()
         # create a vertical layout
         self.show_Gui()
-    #display user interface
+
+    # display user interface
+    def initUI(self):
+        self.setWindowTitle('Document Retrieval Search Software')
+        self.setGeometry(100, 100, 600, 400)
+        self.layout = QVBoxLayout()
+
+        self.search_line = QLineEdit(self)
+        self.search_line.setPlaceholderText('Enter filename to search...')
+        self.layout.addWidget(self.search_line)
+
+        self.search_button = QPushButton('Search', self)
+        self.search_button.clicked.connect(self.search_files)
+        self.layout.addWidget(self.search_button)
+
+        self.results_list = QListWidget(self)
+        self.results_list.itemClicked.connect(self.open_file)
+        self.layout.addWidget(self.results_list)
+
+        self.setLayout(self.layout)
+
     def show_Gui(self):
-        #set the window display title
+        # set the window display title
         self.setWindowTitle('Document Retrieval Search Software')
         # self.showMaximized()
         self.v_layout = QVBoxLayout()
@@ -25,11 +50,11 @@ class File_search(QWidget):
         # document retrieval software description box
         self.introduction = QLabel()
         self.introduction.setText('''<h2 style="text-align: center;font-family: Arial">Document Retrieval Software Description </h2><br/>\
-                                    <font style="font-size:20px;font-family: Arial">
-                                    1.Select the directory to find the desire file from your directory.<br/>\
-                                    2.Type the dire file name to search for. the file can be Word/Excel/Pdf/Text/Python.<br/>\
-                                    3.File name should be .docx/.xlsx/.pdf/.txt/.py, so this software's finding ability is much more accurate.
-                                    </font>''')
+                                        <font style="font-size:20px;font-family: Arial">
+                                        1.Select the directory to find the desire file from your directory.<br/>\
+                                        2.Type the dire file name to search for. the file can be Word/Excel/Pdf/Text/Python.<br/>\
+                                        3.File name should be .docx/.xlsx/.pdf/.txt/.py, so this software's finding ability is much more accurate.
+                                        </font>''')
         self.introduction.setStyleSheet('border: 1px solid #666;line-height:3em;height:5000px')
         self.introduction.setAlignment(Qt.AlignTop)
         # create tooltip text, text box, and browse button
@@ -74,7 +99,7 @@ class File_search(QWidget):
         self.layout3.addWidget(self.tip_text3)
         self.layout3.addWidget(self.text3)
         self.layout3.addWidget(self.find_btn)
-        #display all layouts
+        # display all layouts
         self.v_layout.addWidget(self.introduction, stretch=1)
         self.v_layout.addWidget(self.widget1)
         self.v_layout.addWidget(self.widget2)
@@ -82,14 +107,16 @@ class File_search(QWidget):
         self.result_flag = 0
         self.key_word_result_flag = 0
         self.show()
+
     # user begins to browse the catalog
     def browse_begin(self):
         # open the directory dialog box, if the user clicks OK, the directory will be selected
-        file_name = QFileDialog.getExistingDirectory(self, "Select Directory",)
+        file_name = QFileDialog.getExistingDirectory(self, "Select Directory", )
         if file_name:
-            #set the text in the text input box to the selected directory path by changing '/' to ''
+            # set the text in the text input box to the selected directory path by changing '/' to ''
             self.text1.setText(file_name.replace('/', '\\'))
-    #perform file search operations in a directory and its subdirectories
+
+    # perform file search operations in a directory and its subdirectories
     def search_begin(self):
         dirname = self.text1.text()
         filename = self.text2.text()
@@ -98,7 +125,7 @@ class File_search(QWidget):
         if not dirname and not filename:
             QMessageBox.warning(self, "Warning", "Please enter a Directory path and a File name.")
             return
-        if not dirname :
+        if not dirname:
             QMessageBox.warning(self, "Warning", "Please enter a Directory path.")
             return
         if not filename:
@@ -108,42 +135,46 @@ class File_search(QWidget):
         directory = self.text1.text()
         # If the specified directory path exists, then the method uses the os.walk function to traverse the directory and its subdirectories
         if os.path.exists(directory):
-            for root, dirs, files in os.walk(directory):  
+            for root, dirs, files in os.walk(directory):
                 # This method uses the re.search function to check if the filename meets the search criteria
                 for file in files:
                     # If a match is found, use the os.path.join method to obtain the full path of the file and add it to the allpaths list
-                    if re.search(filename.split('\\')[-1], file): 
-                        path = os.path.join(root, file)  
-                        self.allpathes.append(path)  
+                    if re.search(filename.split('\\')[-1], file):
+                        path = os.path.join(root, file)
+                        self.allpathes.append(path)
             self.show_search_result(self.allpathes)
         # If the specified directory path does not exist, then display a warning message
         else:
             QMessageBox.warning(self, 'Warning', 'Path not exist, Please input a correct path name')
-    #complete the file search operation and display it in the window
+
+    # complete the file search operation and display it in the window
     def show_search_result(self, path_list):
-        # retrieve the directory path and filename respectively from the same input text fields text1 and text2
         directory = self.text1.text()
         filename = self.text2.text()
-        # calculate the number of files found in the search operation
-        file_number=len(path_list)
+        file_number = len(path_list)
+
+        # Reset or create the list widget for results
         if self.result_flag == 0:
-            self.result = QLabel()
-            # self.result.setStyleSheet('border: 1px solid #666;line-height:3em')
-        # calculate the duration of the search operation
-        duration = time.time() - self.search_begin_time
-        # File not found in the search operation
-        if not path_list:
-            self.result.setText(f'<h2 style = "font-family: Arial">No file were founded In directory "{directory}" have name included with "{filename}"<br> In: {duration:.5}s')
-        # find files in the search operation
-        else:
-            self.result.setText(f'<h2 style = "font-family: Arial">In directory "{directory}" which file have name included with "{filename}"<br>Founded: {file_number} file(s) in: {duration:.5}s</h2>' +'<font style="font-size:15px;font-family: Arial;">'+ '<br>'.join(path_list) +'</font>')
-        if self.result_flag == 0:
+            self.result = QListWidget()
             self.v_layout.addWidget(self.result)
             self.result_flag = 1
-        # Delete previous search results before displaying new results
-        if self.key_word_result_flag == 1:
-            self.v_layout.takeAt(self.v_layout.count() - 1).widget().setParent(None)
-            self.key_word_result_flag = 0
+        else:
+            self.result.clear()
+
+        duration = time.time() - self.search_begin_time
+
+        if not path_list:
+            self.result.addItem(
+                f'No files found in "{directory}" with name including "{filename}". Search took {duration:.5f} seconds.')
+        else:
+            for path in path_list:
+                self.result.addItem(path)
+            self.result.addItem(
+                f'Found {file_number} file(s) in {duration:.5f} seconds in directory "{directory}" with name including "{filename}".')
+
+        # Connect the signal for file opening
+        self.result.itemClicked.connect(self.open_file)
+
     # search for keywords in a given file or directory
     def keyword_find_begin(self):
         self.search_begin()
@@ -152,7 +183,8 @@ class File_search(QWidget):
             # self.key_word_result.setStyleSheet('border: 1px solid #666;line-height:3em')
         self.keywordfind_begin_time = time.time()
         # filename = self.text2.text()  # detect through the input format of the second line
-        filename = self.allpathes[0] if self.allpathes else self.text2.text()  # Replace the direct specification of input format in the second line with the format of the first element of self.allpaths
+        filename = self.allpathes[
+            0] if self.allpathes else self.text2.text()  # Replace the direct specification of input format in the second line with the format of the first element of self.allpaths
         typename = filename.split('.')[-1]
         keyword = self.text3.text()
         key_word = self.text3.text()
@@ -162,7 +194,7 @@ class File_search(QWidget):
         else:
             # The auxiliary functions (find_word(), find_excel(), find_text(), or find_pdf()) are used to search for specified keywords within files. They are utilized for searching keywords from specific types of files.
             if os.path.exists(self.text1.text()):
-                if typename in ['.doc', '.docx','doc', 'docx']:
+                if typename in ['.doc', '.docx', 'doc', 'docx']:
                     self.find_word(self.allpathes, keyword)
                 elif typename in ['.xls', '.xlsx', 'xls', 'xlsx']:
                     self.find_excel(self.allpathes, keyword)
@@ -172,17 +204,22 @@ class File_search(QWidget):
                     self.find_pdf(self.allpathes, keyword)
                 # The warning message is displayed. The keyword is not specified or the specified file or directory does not exist.
                 else:
-                    QMessageBox.warning(self, 'Wrong file type!', 'Wrong file type, please input .docx/.pdf/.pdf/.py/.xlsx')
+                    QMessageBox.warning(self, 'Wrong file type!',
+                                        'Wrong file type, please input .docx/.pdf/.pdf/.py/.xlsx')
             else:
                 QMessageBox.warning(self, 'File not exist ', 'File not exist, please input correct File name')
+
     # Display the results of keyword search in the widget
-    def show_find_result(self, txt_list,Keyword,  duration):
+    def show_find_result(self, txt_list, Keyword, duration):
         # Concatenate the matching file list into one string
         if txt_list:
-            self.key_word_result.setText(f'<h2 style = "font-family: Arial">Founded keyword "{Keyword}"from above directory(s) in: {duration:.5}s</h2>' + '<font style="font-size:15px;font-family: Arial;">' + '<br/>'.join(self.txt_list) + '</font>')
+            self.key_word_result.setText(
+                f'<h2 style = "font-family: Arial">Founded keyword "{Keyword}"from above directory(s) in: {duration:.5}s</h2>' + '<font style="font-size:15px;font-family: Arial;">' + '<br/>'.join(
+                    self.txt_list) + '</font>')
         # including the number of matching keywords and the list of matching keyword directories.
         else:
-            self.key_word_result.setText(f'<h2 style = "font-family: Arial">No word "{Keyword}" were founded from above directory in: {duration:.5}s</h2>')
+            self.key_word_result.setText(
+                f'<h2 style = "font-family: Arial">No word "{Keyword}" were founded from above directory in: {duration:.5}s</h2>')
         if self.key_word_result_flag == 0:
             self.v_layout.addWidget(self.key_word_result)
             self.key_word_result_flag = 1
@@ -198,7 +235,8 @@ class File_search(QWidget):
                     self.txt_list.append(f'Founded: {count:<5}  keyword(s) in ' + word)
         duration = time.time() - self.keywordfind_begin_time
         # Use show_find_result() to display the search results.
-        self.show_find_result(self.txt_list,keyword,  duration)
+        self.show_find_result(self.txt_list, keyword, duration)
+
     # Search for keywords in .xlsx file type.
     def find_excel(self, file_list, keyword):
         self.txt_list = []
@@ -214,7 +252,8 @@ class File_search(QWidget):
                     print(f"Error reading {excel}: {e}")
         duration = time.time() - self.keywordfind_begin_time
         # Use show_find_result() to display the search results.
-        self.show_find_result(self.txt_list,keyword,  duration)
+        self.show_find_result(self.txt_list, keyword, duration)
+
     # Search for keywords in .txt and .py file types.
     def find_text(self, file_list, keyword):
         self.txt_list = []
@@ -245,6 +284,24 @@ class File_search(QWidget):
         duration = time.time() - self.keywordfind_begin_time
         # Use show_find_result() to display the search results
         self.show_find_result(self.txt_list, keyword, duration)
+
+    def search_files(self):
+        self.results_list.clear()
+        search_term = self.search_line.text()
+        # Example directory to search
+        for root, dirs, files in os.walk('C:\\'):  # Specify your directory to search
+            for file in files:
+                if search_term.lower() in file.lower():
+                    self.results_list.addItem(os.path.join(root, file))
+
+    def open_file(self, item):
+        file_path = item.text()
+        if sys.platform == "win32":
+            os.startfile(file_path)
+        else:
+            opener = "open" if sys.platform == "darwin" else "xdg-open"
+            subprocess.run([opener, file_path])
+
 
 # The main function calls the QApplication() function for the required GUI page controls and instantiates the custom class File_search.
 if __name__ == '__main__':
