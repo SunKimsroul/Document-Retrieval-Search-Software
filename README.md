@@ -36,3 +36,5 @@ This project does not have any references due to it being my own imagination and
 
 GitHub Repository:
 https://github.com/SunKimsroul/Document-Retrieval-Search-Software.git
+
+#Both of the code working fine and similary but having different GUI.
